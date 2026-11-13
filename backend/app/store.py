@@ -14,6 +14,8 @@ class Store:
         self._tables: dict[str, list[dict[str, Any]]] = {
             name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
         }
+        # 辅助数据不参与运营概览：存放启用版本快照、幂等键索引这类内部记录。
+        self._aux: dict[str, list[dict[str, Any]]] = {}
 
     def module_names(self) -> list[str]:
         return sorted(self._tables)
@@ -26,6 +28,17 @@ class Store:
             if int(row.get("id", 0)) == entry_id:
                 return row
         return None
+
+    def aux_rows(self, name: str) -> list[dict[str, Any]]:
+        """内部辅助记录：版本快照、幂等键等，不计入业务模块列表。"""
+        return self._aux.setdefault(name, [])
+
+    def reset(self) -> None:
+        """恢复示例数据并清空辅助记录，供本地调试与自动化测试使用。"""
+        self._tables = {
+            name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
+        }
+        self._aux = {}
 
     def overview(self) -> dict[str, object]:
         modules: list[dict[str, object]] = []

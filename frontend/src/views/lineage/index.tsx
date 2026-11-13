@@ -11,7 +11,9 @@ const columns = [
   "下游字段",
   "转换说明",
   "采集批次",
-  "关系版本"
+  "关系版本",
+  "来源节点",
+  "生效状态"
 ]
 const actions = [
   "发起解析",
@@ -77,6 +79,11 @@ export default function LineageView() {
       })
       if (!response.ok) {
         throw new Error('数据血缘动作未生效，请稍后重试')
+      }
+      const payload = await response.json()
+      if (!payload.ok) {
+        setErrorMessage(payload.message ?? '数据血缘动作未生效')
+        return
       }
       await reload()
     } catch (error) {

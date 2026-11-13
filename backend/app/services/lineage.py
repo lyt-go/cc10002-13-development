@@ -1,4 +1,8 @@
-"""数据血缘业务规则：状态流转、字段校验与筛选口径都收在这里。"""
+"""数据血缘业务规则：状态流转、字段校验与筛选口径都收在这里。
+
+字段级血缘由转换编排启用时投影写入，这里额外说明血缘的来源版本与生效状态，
+停用只归档不删除，历史可一直追溯。
+"""
 from __future__ import annotations
 
 from typing import Any
@@ -30,6 +34,15 @@ class LineageService:
         start = max(page - 1, 0) * size
         return rows[start:start + size], total
 
+    def project_view(self, *, up_table: str | None = None, down_table: str | None = None) -> dict[str, Any]:
+        """按表名返回字段级血缘与链条路径，只读不写。"""
+        rows = store.rows(MODULE)
+        if up_table:
+            rows = [row for row in rows if str(row.get("上游表名")) == up_table]
+        if down_table:
+            rows = [row for row in rows if str(row.get("下游表名")) == down_table]
+        return {"items": rows, "total": len(rows)}
+
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
         return store.find(MODULE, entry_id)
 
@@ -52,6 +65,11 @@ class LineageService:
             return None, f"血缘关系 {entry_id} 不存在或已归档"
         if action not in ACTION_RULES:
             return None, f"动作「{action}」不属于数据血缘可执行范围"
+        if entry.get("生效状态") == "历史归档":
+            return None, (
+                f"血缘关系 {entry.get('关系编号')} 已随转换节点停用归档，只读追溯，"
+                "不能再执行状态流转"
+            )
         target = ACTION_RULES[action]
         if target not in STATUS_ORDER:
             return None, f"目标状态「{target}」不在允许的状态序列里"

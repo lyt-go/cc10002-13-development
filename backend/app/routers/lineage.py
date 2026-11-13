@@ -14,6 +14,7 @@ service = LineageService()
 
 LIST_FIELDS = ["关系编号", "上游表名", "下游表名", "上游字段", "下游字段", "转换说明", "采集批次", "关系版本"]
 STATUSES = ["草稿", "解析中", "已确认", "已废弃"]
+EFFECTIVE_STATES = ["生效中", "历史归档"]
 
 
 @router.get("", response_model=PageResult[dict])
@@ -28,6 +29,22 @@ def list_entries(
         raise HTTPException(status_code=400, detail="每页最多 200 条，请缩小分页范围")
     items, total = service.list_entries(keyword=keyword, status=status, page=page, size=size)
     return PageResult(items=items, total=total, page=page, size=size)
+
+
+@router.get("/projection", response_model=dict)
+def projection(
+    up_table: str | None = Query(default=None, description="按上游表名过滤"),
+    down_table: str | None = Query(default=None, description="按下游表名过滤"),
+) -> dict:
+    """字段级血缘投影：只读返回启用时生成的上下游字段关系与版本来源。"""
+    return service.project_view(up_table=up_table, down_table=down_table)
+
+
+@router.get("/export")
+def export_entries() -> dict[str, Any]:
+    """导出数据血缘清单：返回当前过滤条件下的全量数据。"""
+    items, total = service.list_entries(page=1, size=10000)
+    return {"module": "lineage", "total": total, "items": items}
 
 
 @router.get("/{entry_id}", response_model=dict)
@@ -56,10 +73,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出数据血缘清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "lineage", "total": total, "items": items}
